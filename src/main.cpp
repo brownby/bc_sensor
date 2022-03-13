@@ -1,32 +1,29 @@
-#include<Wire.h>
-#include<SPI.h>
+#include<Arduino.h>
 #include<SD.h>
+#include<SPI.h>
+#include<Wire.h>
+#include<SHT31.h>
+#include<HoneywellZephyrI2C.h>
 
+ZephyrFlowRateSensor frs(0x49, 200);
 File data_file;
+SHT31 sht;
 
-#define SDA 0  // PA08
-#define SCL 0  // PA09
+#define dim_   0 // PA22
+#define frs_   1 // PA23
+#define trh_   2 // PA10
+#define ler_   3 // PA11
+#define leg_   4 // PB10
+#define leb_   5 // PB11
+#define stat_  7 // PA21
+#define en_    8 // PA16, MOSI (!)
+#define cd_   30 // PA27
 
-#define SD_MOSI 0 // PA12
-#define SD_MISO 0 // PA15
-#define SD_SCK  0 // PA13
-#define SD_NSS  0 // PA14
-#define SD_CD   0 // PA27
-
-#define dim_   D0 // PA22
-#define frs_   D1 // PA23
-#define trh_   D2 // PA10
-#define ler_   D3 // PA11
-#define leg_   D4 // PB10
-#define leb_   D5 // PB11
-#define stat_  D7 // PA21
-#define en_    D8 // PA16, MOSI (!)
-
+#define dac_   A0 // PA02
 #define v_bc_  A1 // PB02
 #define v_ref_ A2 // PB03
 #define usb_   A3 // PA04
 
-#define dac_   DAC0         // PA02 (aka A0)
 #define led_   LED_BUILTIN  // PB08
 #define bat_   ADC_BATTERY  // PB09
 
@@ -50,24 +47,15 @@ int flow_h = 0;    // ccm, at DAC max
    
 int v_bc;  
 int v_ref;
-int temp;  // in celcius 
-int rhum;  // in %
-int flow;  // in ccm
+
+float temp;  // in celcius 
+float rhum;  // in %
+float flow;  // in ccm
 
 void setup() {
 
-  Serial.begin(115200);
-  Serial.println("setup");
-  digitalWrite(led_,HIGH);
-
-  Wire.begin();
-  SD.begin();
-
-  data_file = SD.open("data.txt", O_CREATE);
-  if (!data_file){
-    Serial.println("error opening file");
-  }
-  file.close()  
+  //Serial.begin(115200);
+  //Serial.println("setup");
 
   pinMode(dim_, OUTPUT);
   pinMode(frs_, OUTPUT);
@@ -78,12 +66,40 @@ void setup() {
   pinMode(en_,  OUTPUT);
   pinMode(dac_, OUTPUT);
   pinMode(led_, OUTPUT);
+  pinMode(cd_, INPUT_PULLUP);
 
+  digitalWrite(frs_, HIGH);
+  digitalWrite(trh_, HIGH);
+  digitalWrite(led_, HIGH);
+
+
+  digitalWrite(en_, LOW); // disable blower
+
+  Wire.begin();
+  Wire.setClock(100000);
+  sht.begin(0x44);
+  frs.begin();
+
+  SD.begin();
+
+  if (!digitalRead(cd_)){
+    data_file = SD.open("data.txt", FILE_WRITE);
+    if (!data_file){
+    //Serial.println("error opening file");
+    }
+    data_file.close(); 
+  }
+  else{
+    //Serial.println("no SD card detected");
+  }
+  
   analogReadResolution(12);
   analogWriteResolution(10);
 
-  digitalWrite(en_, en); // disable blower
+  digitalWrite(frs_, LOW);
+  digitalWrite(trh_, LOW);
   digitalWrite(led_, LOW);
+
 
 }
 
@@ -125,72 +141,49 @@ void get_pd() {
 
 }
 
-int get_flow() {
+void get_flow() {
 
-  Wire.requestFrom(byte(0x49), 2);
+  flow = frs.flow();
 
-  delay(100);
-
-  if (2 <= Wire.available()) {
-    int flow_raw = Wire.read();
-    flow_raw = flow_raw << 8; 
-    flow_raw |= Wire.read();
-  }
-
-  flow = 200*((flow_raw/16384-0.5)/0.4);
-
+  
   digitalWrite(frs_, HIGH);
-  delay(250);
-  digitalWrite(frs_, LOW);
-
-  return flow;
+  delay(50);
+  digitalWrite(frs_, LOW);  
 
 }
 
 void get_trh() {
 
-  Wire.beginTransmission(byte(0x44));
-  Wire.write(byte(0x2C)); // clock stretching, vs no = 0x24
-  Wire.write(byte(0x0D)); // medium repeatability (or 0x0B if no clk stretch)
-  Wire.endTransmission();
-
-  delay(100);
-
-  if (2 <= Wire.available()) {
-    int temp_raw = Wire.read();
-    temp_raw = temp_raw << 8; 
-    temp_raw |= Wire.read();
-  }
-
-  if (2 <= Wire.available()) {
-    int rhum_raw = Wire.read();
-    rhum_raw = rhum_raw << 8; 
-    rhum_raw |= Wire.read();
-  }
-
-  temp = -45 + 175*(temp_raw/65535);
-  rhum = 100*(rhum_raw/65535);
+  sht.read();
+  temp = sht.getTemperature();
+  rhum = sht.getHumidity();
 
   digitalWrite(trh_, HIGH);
-  delay(250);
+  delay(50);
   digitalWrite(trh_, LOW);
-
+  
 }
 
 void write_data(){
-  
-  data_file = SD.open(data.txt, O_APPEND);
-  if (data_file){
-    char buffer[50];
-    sprintf(buffer, "%d V, %d V, %d C, %d RH, %d ccm", v_bc, v_ref, temp, rhum, flow); 
-    data_file.println(buffer);
-  }
-  data_file.close();
+  //if (!digitalRead(cd_)){
+    digitalWrite(frs_, HIGH);
+    data_file = SD.open("data.txt", FILE_WRITE);
+    if (data_file){
+      char buffer[50];
+      //sprintf(buffer, "%d V, %d V, %f C, %f RH, %f ccm", v_bc, v_ref, temp, rhum, flow); 
+      //sprintf(buffer, "%f C, %f RH", temp_raw, rhum_raw); 
+      data_file.println(buffer);
+    }
+    data_file.close();
+  //}
+  //else{
+    digitalWrite(frs_, LOW);
+  //}
 }
 
 void parse_cmd(){
 
-  if(Serial.available > 0){
+  if(Serial.available() > 0){
     char incoming = Serial.read();
     if(incoming == 'b'){
       Serial.print("battery voltage is: ");
@@ -226,25 +219,37 @@ void check_state(){
 
 void loop() {
 
-  if (digitalRead(stat_) && !digitalRead(usb_)){
-    set_flow(rate);
-    set_dim(dim);
-    flow = get_flow();
+  get_trh();
+  get_flow();
 
-    if (abs(flow-rate)<10){
-      delay(10);
-      get_trh();
-      get_pd();
-      delay(10);
-      write_data();
-      en = false;
-      digitalWrite(en_, en);        
-    }
+  if (digitalRead(cd_)){
+    digitalWrite(led_, HIGH);
   }
+  else{
+    digitalWrite(led_, LOW);
+  }
+
+  delay(1000);
+
+  // if (digitalRead(stat_) && !digitalRead(usb_)){
+  //   set_flow(rate);
+  //   set_dim(dim);
+  //   get_flow();
+
+  //   if (abs(flow-rate)<10){
+  //     delay(10);
+  //     get_trh();
+  //     get_pd();
+  //     delay(10);
+  //     write_data();
+  //     en = false;
+  //     digitalWrite(en_, en);        
+  //   }
+  // }
   
-  for (byte i = 0; i < interval; i++) {
-    check_state();
-    parse_cmd();
-    delay(1000);
-  }
+  // for (byte i = 0; i < interval; i++) {
+  //   check_state();
+  //   parse_cmd();
+  //   delay(1000);
+  // }
 }
