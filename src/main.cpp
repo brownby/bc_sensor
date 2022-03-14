@@ -52,6 +52,11 @@ float temp;  // in celcius
 float rhum;  // in %
 float flow;  // in ccm
 
+// other
+
+bool flag = 0;
+unsigned int rgb[3]; 
+
 void setup() {
 
   //Serial.begin(115200);
@@ -72,8 +77,8 @@ void setup() {
   digitalWrite(trh_, HIGH);
   digitalWrite(led_, HIGH);
 
-
   digitalWrite(en_, LOW); // disable blower
+  digitalWrite(dac_, LOW);
 
   Wire.begin();
   Wire.setClock(100000);
@@ -94,24 +99,23 @@ void setup() {
   }
   
   analogReadResolution(12);
-  analogWriteResolution(10);
+  analogWriteResolution(8);
 
   digitalWrite(frs_, LOW);
   digitalWrite(trh_, LOW);
   digitalWrite(led_, LOW);
 
-
 }
 
 void set_dim(byte level) {
 
-  if (level < 1 || level > 32) {
-    Serial.println("LED level argument must be between 1 and 32");
-  }
+  // if (level < 1 || level > 32) {
+  //   Serial.println("LED level argument must be between 1 and 32");
+  // }
   
   digitalWrite(dim_, HIGH);
-  
-  for (byte i = 0; i < (32-level); i++) {
+
+  for (byte i = 1; i < (32-level); i++) {
     digitalWrite(dim_, LOW);
     digitalWrite(dim_, HIGH);
   }
@@ -128,9 +132,13 @@ void set_flow(int rate) {
 
 void set_ring(int red, int green, int blue) {
 
-  analogWrite(ler_, red);
-  analogWrite(leg_, green);
-  analogWrite(leb_, blue);
+  rgb[0] = 255-red; 
+  rgb[1] = 255-green;
+  rgb[2] = 255-blue;
+
+  analogWrite(ler_, rgb[0]);
+  analogWrite(leg_, rgb[1]);
+  analogWrite(leb_, rgb[2]);
 
 }
 
@@ -221,13 +229,14 @@ void loop() {
 
   get_trh();
   get_flow();
+  set_ring(200, 0, 255);
 
-  if (digitalRead(cd_)){
-    digitalWrite(led_, HIGH);
+  if (!flag){
+    set_dim(32);
+    flag = true;
   }
-  else{
-    digitalWrite(led_, LOW);
-  }
+
+  get_pd();
 
   delay(1000);
 
