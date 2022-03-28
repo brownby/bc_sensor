@@ -99,7 +99,7 @@ void setup() {
   }
   
   analogReadResolution(12);
-  analogWriteResolution(8);
+  analogWriteResolution(10);
 
   digitalWrite(frs_, LOW);
   digitalWrite(trh_, LOW);
@@ -227,18 +227,31 @@ void check_state(){
 
 void loop() {
 
-  get_trh();
-  get_flow();
-  set_ring(200, 0, 255);
+  analogWrite(dac_, 1023);
+  digitalWrite(led_, HIGH);
+  delay(100);
+  digitalWrite(led_,LOW);
+  delay(100);
+  // get_trh();
+  // get_flow();
 
-  if (!flag){
-    set_dim(32);
-    flag = true;
+  // if (!flag){
+  //   digitalWrite(en_, LOW);
+  //   analogWrite(dac_, 200);
+  //   set_ring(0, 0, 255);
+  //   set_dim(32);
+  //   flag = true;
+  // }
+
+  if (!digitalRead(stat_)){
+    set_ring(255,0,0);
+  }
+  else{
+    set_ring(0,0,255);
   }
 
-  get_pd();
+  // get_pd();
 
-  delay(1000);
 
   // if (digitalRead(stat_) && !digitalRead(usb_)){
   //   set_flow(rate);
