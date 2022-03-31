@@ -69,7 +69,7 @@ void setup() {
   pinMode(leg_, OUTPUT);
   pinMode(leb_, OUTPUT);
   pinMode(en_,  OUTPUT);
-  pinMode(dac_, OUTPUT);
+  //pinMode(dac_, OUTPUT);
   pinMode(led_, OUTPUT);
   pinMode(cd_, INPUT_PULLUP);
 
@@ -78,7 +78,7 @@ void setup() {
   digitalWrite(led_, HIGH);
 
   digitalWrite(en_, LOW); // disable blower
-  digitalWrite(dac_, LOW);
+  analogWrite(dac_, 255);
 
   Wire.begin();
   Wire.setClock(100000);
@@ -99,7 +99,7 @@ void setup() {
   }
   
   analogReadResolution(12);
-  analogWriteResolution(10);
+  analogWriteResolution(8);
 
   digitalWrite(frs_, LOW);
   digitalWrite(trh_, LOW);
@@ -227,7 +227,7 @@ void check_state(){
 
 void loop() {
 
-  analogWrite(dac_, 1023);
+  analogWrite(dac_, 255);
   digitalWrite(led_, HIGH);
   delay(100);
   digitalWrite(led_,LOW);
@@ -235,13 +235,12 @@ void loop() {
   // get_trh();
   // get_flow();
 
-  // if (!flag){
-  //   digitalWrite(en_, LOW);
-  //   analogWrite(dac_, 200);
-  //   set_ring(0, 0, 255);
-  //   set_dim(32);
-  //   flag = true;
-  // }
+  if (!flag){
+    digitalWrite(en_, LOW);
+    set_ring(0, 0, 255);
+    set_dim(32);
+    flag = true;
+  }
 
   if (!digitalRead(stat_)){
     set_ring(255,0,0);
@@ -250,7 +249,7 @@ void loop() {
     set_ring(0,0,255);
   }
 
-  // get_pd();
+  get_pd();
 
 
   // if (digitalRead(stat_) && !digitalRead(usb_)){
